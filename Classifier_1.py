@@ -78,22 +78,54 @@ def train(model, loss_fn, optimizer):
 # step 3 - testing loop
 
 def test(model, loss_func):
-    size = len(loader_test)
+    size_test = len(loader_test.dataset)
+    size_validation = len(loader_validate.dataset)
     model.eval()
-    test_loss, correct = 0, 0
-    with torch.no_grad():
-        for input, target_output in loader_test:
-            pred = model(input)
+    test_loss, test_correct = 0, 0
+    val_loss, val_correct = 0, 0
+
+    with torch.no_grad():  # disables gradient calculation
+        for input, target_output in loader_validate:  # loop through dntire validation data set
+            pred = model(input)  # what the model predicts
+            # sums the loss for each element in the data set
+            val_loss += loss_func(pred, target_output).item()
+            val_correct += (pred.argmax(1) ==
+                            target_output).type(torch.float).sum().item()  # the sum of every element thte ANN correctly classifies
+
+    test_loss /= size_test  # calculates the average loss over the test data set
+    # calculates percentage of elements the ANN correctly classifies
+    test_correct /= size_test
+
+    with torch.no_grad():  # disables gradient calculation
+        for input, target_output in loader_test:  # loop through dntire test data set
+            pred = model(input)  # what the model predicts
+            # sums the loss for each element in the data set
             test_loss += loss_func(pred, target_output).item()
-            correct += (pred.argmax(1) ==
-                        target_output).type(torch.float).sum().item()
-    test_loss /= size
-    correct /= size
-    print("test loss", test_loss)
-    print("Size:", size)
-    print("Correct", correct)
+            test_correct += (pred.argmax(1) ==
+                             target_output).type(torch.float).sum().item()  # the sum of every element thte ANN correctly classifies
+    # pred.argmax(1) gets the digit that has the highest probability. i.e. what digit the ANN classifies the image as
+
+    test_loss /= size_test  # calculates the average loss over the test data set
+    # calculates percentage of elements the ANN correctly classifies
+    test_correct /= size_test
+
+    val_loss /= size_validation
+    val_correct /= size_validation
+
+    print()
+    print("val size", size_validation)
+    print("Validation data set")
+    print("validation loss", val_loss)
+    print("Correct", val_correct)
     print(
-        f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
+        f"Test Error: \n Accuracy: {(100*val_correct):>0.1f}%, Avg loss: {val_loss:>8f} \n")
+
+    print("Test data set")
+    print("test size", size_test)
+    print("test loss", test_loss)
+    print("Correct", test_correct)
+    print(
+        f"Test Error: \n Accuracy: {(100*test_correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
 
 ##############################
 
@@ -105,8 +137,7 @@ image_size = 28*28
 hidden = 512
 classes = 10
 
-model = nn.Sequential(nn.Linear(image_size, hidden),
-                      nn.ReLU(), nn.Linear(hidden, hidden), nn.ReLU(), nn.Linear(hidden, classes))
+model = nn.Sequential(nn.Linear(image_size, classes))
 opt = optim.Adam(model.parameters())
 loss_func = torch.nn.CrossEntropyLoss()
 
