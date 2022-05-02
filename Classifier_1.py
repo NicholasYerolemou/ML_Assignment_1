@@ -1,6 +1,6 @@
 
 import torchvision.transforms as transforms
-from torchvision.transforms import ToTensor
+from torchvision.transforms import ToTensor, Lambda, Compose
 import matplotlib
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,46 +14,26 @@ import torch.utils.data as data
 from torchvision.datasets import MNIST
 
 
-# input the training data the ttar.gz file
-# transform the input images input pytorch tensor
-
-# get the test data from the user images from the .zip files
-
-# create a trainging loop with dataloader, model, loss_fn, optimizer
-
-# test funciton used after 10 training examples
-
-
-# creates neural nerwork class
-# define the constructor
-# defines foward method
-
-
-# define loss function
-# define optimizer
-
-# loop and call train method
-
-# stochastic gradient decent optomizer drives the learning, paramters are what it adjusts
-
-# loss function
-# optomiser
-
-# check overfitting 20;00 in video (run model in data it hasnt seen - test data)
-
-
 # step 1 - data
-target_directory = "mnist"
+target_directory = ""
 
+
+def flatten(inp):
+    return inp.reshape(-1)
+
+
+transform = transforms.Compose([transforms.ToTensor(), flatten])
 
 train_data = MNIST(target_directory, train=True,
-                   download=True, transform=ToTensor())
+                   download=True, transform=transform)
+
+print("the shape is", train_data[0][0].shape)
 
 train_data, validate_data = data.random_split(train_data, (48000, 12000))
 len(train_data), len(validate_data)  # split the training data into two parts
 
 test_data = MNIST(target_directory, train=True,
-                  download=True, transform=ToTensor())
+                  download=True, transform=transform)
 
 batch_size = 64
 # loader for the training data
@@ -72,27 +52,61 @@ loader_test = data.DataLoader(
 
 def train(model, loss_fn, optimizer):
     print("Training")
-    for batch, (input, output) in enumerate(train_data):
-        print(batch)
+    for batch, (input, target_output) in enumerate(loader_train):
+        #input, target_output = input.to(device), target_output.to(device)
+
+        # the predicted values when model is passed the input
+        predicted = model(input)
+        # difference between out value and target value
+        loss = loss_fn(predicted, target_output)
+
+        # backpropogation
+        optimizer.zero_grad()  # why do we zero the gradient of the optomiser
+        loss.backward()
+        optimizer.step()
+
+        size = len(loader_train.dataset)
+        part = size/10
+
+        if batch % 100 == 0:
+            loss, current = loss.item(), batch * len(input)
+            print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+
 ###############################
 
 
 # step 3 - testing loop
 
-def test(model):
-    print("Testing")
-
+def test(model, loss_func):
+    size = len(loader_test)
+    model.eval()
+    test_loss, correct = 0, 0
+    with torch.no_grad():
+        for input, target_output in loader_test:
+            pred = model(input)
+            test_loss += loss_func(pred, target_output).item()
+            correct += (pred.argmax(1) ==
+                        target_output).type(torch.float).sum().item()
+    test_loss /= size
+    correct /= size
+    print("test loss", test_loss)
+    print("Size:", size)
+    print("Correct", correct)
+    print(
+        f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
 
 ##############################
 
 # step 4 - model
 
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
 image_size = 28*28
 hidden = 512
 classes = 10
 
 model = nn.Sequential(nn.Linear(image_size, hidden),
-                      nn.ReLU(), nn.Linear(hidden, classes))
+                      nn.ReLU(), nn.Linear(hidden, hidden), nn.ReLU(), nn.Linear(hidden, classes))
 opt = optim.Adam(model.parameters())
 loss_func = torch.nn.CrossEntropyLoss()
 
@@ -103,5 +117,5 @@ print(model)
 for epoch in range(n_epochs):
     print("Epoch", epoch + 1)
     train(model, loss_func, opt)
-    test(model)
+    test(model, loss_func)
 print("Done")
